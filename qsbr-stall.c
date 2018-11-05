@@ -8,6 +8,10 @@
 #include <urcu/rculist.h>
 #include <urcu/compiler.h>
 #include <stdio.h>
+#include <signal.h>
+#include <execinfo.h>
+#include <utmpx.h>
+#include <sys/types.h>
 
 using namespace std;
 
@@ -43,6 +47,22 @@ void free_node_rcu(struct rcu_head *head)
 	free(node);
 }
 
+void
+termination_handler (int signum)
+{
+	 #ifdef SYS_gettid
+pid_t tid = syscall(SYS_gettid);
+#else
+#error "SYS_gettid unavailable on this system"
+#endif
+
+    printf("Within signal handler..%d\n",tid);
+   // void * buffer[255];
+   // const int calls = backtrace(buffer, sizeof(buffer) / sizeof(void *));
+   // backtrace_symbols_fd(buffer, calls, 1);
+    _exit(0);
+}
+
 int main(){
 	readers = (pthread_t *)malloc(sizeof(pthread_t)*100);
 	writers = (pthread_t *)malloc(sizeof(pthread_t)*100);
@@ -52,6 +72,16 @@ int main(){
 	readers_id = (long int *)malloc(sizeof(long int)*100);
 	writers_id = (long int *)malloc(sizeof(long int)*100);
 	struct mynode *node,*n;
+	struct sigaction new_action;
+	new_action.sa_handler = termination_handler;
+    	sigemptyset (&new_action.sa_mask);
+    	new_action.sa_flags = 0;
+	
+	sigaction (SIGINT, &new_action, NULL);
+//  	sigaction (SIGHUP, &new_action, NULL);
+  	sigaction (SIGTERM, &new_action, NULL);
+    	sigaction (SIGSEGV, &new_action, NULL);
+
 
 	for(int i = 0;i < size;i++){
 		node = (struct mynode *)malloc(sizeof(*node));
@@ -97,10 +127,12 @@ void *reader_fn(void *arg){
 	
 	long int t_id = *(long *)arg;
 	struct mynode *node;
+	char* addr = (char *)0xdeadbeef;
 	rcu_register_thread();
 	if(t_id == 1){
-		while (1);
+		while(1);
 	}
+	
 	for(int i = 0;i < nreaders;i++){
 		cds_list_for_each_entry(node, &mylist, node) {
 			int temp =  node->value;
