@@ -6,7 +6,7 @@ times = []
 
 print file_name1
 
-for i in range(13):
+for i in range(52):
 	times.append(i)
 
 memory_consumed = []
